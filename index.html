@@ -1,0 +1,374 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>動物醫院商品庫存管理</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#25352f;background:#f4f7f5}
+*{box-sizing:border-box}
+body{margin:0}
+header{background:#245b49;color:white;padding:22px 18px}
+header h1{font-size:22px;margin:0 0 7px}
+header p{margin:0;font-size:13px;opacity:.85}
+main{max-width:1050px;margin:auto;padding:16px}
+nav{display:flex;gap:8px;overflow:auto;padding-bottom:12px}
+nav button{white-space:nowrap;border:1px solid #d6e2dc;background:white;color:#355348;border-radius:10px;padding:11px 14px}
+nav button.active,.primary{background:#245b49;color:white;border-color:#245b49}
+button{cursor:pointer;font:inherit}
+.card{background:white;border:1px solid #e0e9e4;border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 14px}
+h3{font-size:15px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{display:block;font-size:13px;color:#52675e}
+input,select,textarea{display:block;width:100%;margin-top:5px;padding:11px;border:1px solid #ccd9d2;border-radius:8px;background:white;color:#25352f;font:inherit;min-width:0}
+textarea{min-height:70px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.actions button,.smallbtn{border:1px solid #ccd9d2;border-radius:8px;padding:9px 12px;background:white;color:#294c3e}
+.actions .primary{background:#245b49;color:white}
+.danger{color:#a23a32!important;border-color:#e8c8c4!important}
+.note{font-size:13px;color:#687a72;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{background:#f0f6f2;border-radius:10px;padding:13px}
+.stat strong{display:block;font-size:23px;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #e7eee9;vertical-align:top}
+th{color:#61746a;font-weight:600}
+.tablewrap{overflow-x:auto}
+.tag{display:inline-block;border-radius:6px;padding:3px 7px;background:#eaf3ed;color:#32634d;font-size:12px}
+.warn{background:#fff3df;color:#885b12}
+.bad{background:#fbe8e5;color:#a23a32}
+.item{border-bottom:1px solid #e7eee9;padding:12px 0}
+.item:last-child{border-bottom:0}
+.itemtitle{font-weight:650;margin-bottom:5px}
+.hidden{display:none!important}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}main{padding:12px}.card{padding:13px}header{padding:19px 14px}}
+</style>
+</head>
+<body>
+<header>
+<h1>動物醫院商品庫存管理</h1>
+<p>進貨・定期盤點・效期追蹤・叫貨參考</p>
+</header>
+<main>
+<nav id="nav">
+<button class="active" data-page="home">總覽</button>
+<button data-page="products">商品管理</button>
+<button data-page="suppliers">供應商</button>
+<button data-page="inbounds">進貨登記</button>
+<button data-page="counts">定期盤點</button>
+<button data-page="history">紀錄查詢</button>
+<button data-page="backup">備份還原</button>
+</nav>
+
+<section id="home" class="page">
+<div class="stats">
+<div class="stat">商品種類<strong id="statProducts">0</strong></div>
+<div class="stat">待盤點商品<strong id="statCounts">0</strong></div>
+<div class="stat">效期提醒<strong id="statExpiry">0</strong></div>
+</div>
+<div class="card" style="margin-top:14px">
+<h2>需要注意的事項</h2>
+<div id="alerts" class="note">目前沒有資料。</div>
+</div>
+<div class="card">
+<h2>庫存概況</h2>
+<p class="note">推估庫存＝最近一次實際盤點數量＋盤點日後的進貨量。此數字不會自動扣除銷售或領用，並不等於即時實際庫存。</p>
+<div class="tablewrap"><table><thead><tr><th>商品</th><th>最近盤點</th><th>盤點後進貨</th><th>推估庫存</th><th>安全庫存</th></tr></thead><tbody id="stockTable"></tbody></table></div>
+</div>
+</section>
+
+<section id="products" class="page hidden">
+<div class="card">
+<h2 id="productFormTitle">新增商品</h2>
+<form id="productForm">
+<input type="hidden" name="id">
+<div class="grid">
+<label>商品名稱 *<input name="name" required></label>
+<label>商品條碼<input name="barcode" inputmode="numeric" placeholder="可先留空"></label>
+<label>規格<input name="spec" placeholder="例如：10 mg、100 顆/瓶"></label>
+<label>庫存單位 *<input name="unit" required placeholder="例如：盒、瓶、包"></label>
+<label>商品分類<input name="category" placeholder="例如：藥品、耗材"></label>
+<label>安全庫存<input name="safety" type="number" min="0" step="any" value="0"></label>
+<label>預設供應商<select name="supplierId" id="productSupplier"></select></label>
+<label>盤點週期<select name="interval"><option value="14">每兩週</option><option value="30" selected>每一個月</option><option value="90">每三個月</option><option value="182">每半年</option><option value="365">每一年</option></select></label>
+<label>存放位置<input name="location" placeholder="例如：藥櫃 A 區"></label>
+<label>備註<input name="note"></label>
+</div>
+<div class="actions"><button class="primary" type="submit">儲存商品</button><button type="button" id="cancelProduct">清空表單</button></div>
+<p class="note">條碼需對應正確商品與規格；新增條碼前請先核對實物。</p>
+</form>
+</div>
+<div class="card"><h2>商品清單</h2><label>搜尋商品<input id="productSearch" placeholder="輸入名稱、條碼或規格"></label><div id="productList"></div></div>
+</section>
+
+<section id="suppliers" class="page hidden">
+<div class="card">
+<h2 id="supplierFormTitle">新增供應商</h2>
+<form id="supplierForm">
+<input type="hidden" name="id">
+<div class="grid">
+<label>供應商名稱 *<input name="name" required></label>
+<label>聯絡人<input name="contact"></label>
+<label>電話<input name="phone" type="tel"></label>
+<label>Email<input name="email" type="email"></label>
+<label>LINE 聯絡方式<input name="line"></label>
+<label>訂貨網址<input name="url" type="url" placeholder="https://"></label>
+<label>地址<input name="address"></label>
+<label>備註<input name="note"></label>
+</div>
+<div class="actions"><button class="primary" type="submit">儲存供應商</button><button type="button" id="cancelSupplier">清空表單</button></div>
+</form>
+</div>
+<div class="card"><h2>供應商清單</h2><div id="supplierList"></div></div>
+</section>
+
+<section id="inbounds" class="page hidden">
+<div class="card">
+<h2>新增進貨紀錄</h2>
+<form id="inboundForm">
+<div class="grid">
+<label>進貨日期 *<input name="date" type="date" required></label>
+<label>商品 *<select name="productId" id="inProduct" required></select></label>
+<label>供應商<select name="supplierId" id="inSupplier"></select></label>
+<label>進貨數量 *<input name="qty" type="number" min="0.000001" step="any" required></label>
+<label>整批進貨總金額 *<input name="amount" type="number" min="0" step="0.01" required></label>
+<label>批號<input name="lot"></label>
+<label>有效期限<input name="expiry" type="date"></label>
+<label>訂單／發票編號<input name="invoice"></label>
+</div>
+<p class="note" id="unitCost">選擇商品與數量後會計算單位成本。</p>
+<div class="actions"><button class="primary" type="submit">確認進貨</button></div>
+<p class="note">按下確認後會新增一筆紀錄。請先核對資料，避免重複登記。</p>
+</form>
+</div>
+<div class="card"><h2>最近進貨</h2><div id="inboundList"></div></div>
+</section>
+
+<section id="counts" class="page hidden">
+<div class="card">
+<h2>定期實際盤點</h2>
+<p class="note">請填寫現場實際點到的數量。每次盤點都會保存新紀錄，不會刪除舊紀錄。盤點不會自動扣除銷售或領用。</p>
+<form id="countForm">
+<div class="grid">
+<label>盤點日期 *<input name="date" type="date" required></label>
+<label>商品 *<select name="productId" id="countProduct" required></select></label>
+<label>實際盤點數量 *<input name="qty" type="number" min="0" step="any" required></label>
+<label>備註<input name="note" placeholder="例如：外盒破損、數量差異"></label>
+</div>
+<p class="note" id="lastCountInfo">選擇商品後會顯示上次盤點資訊。</p>
+<div class="actions"><button class="primary" type="submit">保存盤點紀錄</button></div>
+</form>
+</div>
+<div class="card"><h2>盤點提醒清單</h2><div id="dueList"></div></div>
+</section>
+
+<section id="history" class="page hidden">
+<div class="card"><h2>紀錄查詢</h2>
+<label>依商品篩選<select id="historyProduct"></select></label>
+<div id="historyList" style="margin-top:12px"></div>
+</div>
+</section>
+
+<section id="backup" class="page hidden">
+<div class="card">
+<h2>資料備份</h2>
+<p class="note">資料目前保存在這個瀏覽器的本機儲存空間。請定期下載備份檔，並存放在安全的位置。不要把備份檔當作公開文件分享。</p>
+<div class="actions"><button class="primary" id="exportBtn" type="button">下載 JSON 備份</button></div>
+</div>
+<div class="card">
+<h2>還原資料</h2>
+<p class="note">匯入備份會取代目前瀏覽器中的所有系統資料。請先下載目前資料的備份。</p>
+<label>選擇備份檔<input id="importFile" type="file" accept=".json,application/json"></label>
+<div class="actions"><button id="importBtn" type="button" class="danger">還原備份並取代現有資料</button></div>
+</div>
+<div class="card"><h2>系統資料狀態</h2><p id="storageInfo" class="note"></p></div>
+</section>
+</main>
+
+<script>
+"use strict";
+const KEY="vetInventoryV1";
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const today=()=>new Date().toLocaleDateString("en-CA");
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString("zh-TW",{maximumFractionDigits:3});
+const dateText=d=>d||"未填";
+const intervalText=n=>({"14":"每兩週","30":"每月","90":"每三個月","182":"每半年","365":"每年"}[String(n)]||"每月");
+function blank(){return {products:[],suppliers:[],inbounds:[],counts:[]};}
+function load(){
+ try{
+  const d=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(!d||!Array.isArray(d.products)||!Array.isArray(d.suppliers)||!Array.isArray(d.inbounds)||!Array.isArray(d.counts))return blank();
+  return d;
+ }catch{return blank();}
+}
+let db=load();
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render();}
+function formObj(form){return Object.fromEntries(new FormData(form).entries());}
+function resetForm(form){form.reset();const id=form.querySelector('[name="id"]');if(id)id.value="";}
+function product(id){return db.products.find(p=>p.id===id);}
+function supplier(id){return db.suppliers.find(s=>s.id===id);}
+function lastCount(pid){return db.counts.filter(c=>c.productId===pid).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt))[0]||null;}
+function inboundAfter(pid,date){return db.inbounds.filter(i=>i.productId===pid&&(!date||i.date>date)).reduce((n,i)=>n+Number(i.qty),0);}
+function estimate(p){const c=lastCount(p.id);return c?Number(c.qty)+inboundAfter(p.id,c.date):null;}
+function dueDate(p){const c=lastCount(p.id);if(!c)return null;const d=new Date(c.date+"T12:00:00");d.setDate(d.getDate()+Number(p.interval||30));return d.toLocaleDateString("en-CA");}
+function daysBetween(a,b){return Math.ceil((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);}
+function setOptions(sel,items,firstLabel){
+ const old=sel.value;
+ sel.innerHTML=`<option value="">${esc(firstLabel)}</option>`+items.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+ if(items.some(x=>x.id===old))sel.value=old;
+}
+function renderSelects(){
+ setOptions($("#productSupplier"),db.suppliers,"不指定");
+ setOptions($("#inSupplier"),db.suppliers,"不指定供應商");
+ setOptions($("#inProduct"),db.products,"選擇商品");
+ setOptions($("#countProduct"),db.products,"選擇商品");
+ setOptions($("#historyProduct"),[{id:"",name:"全部商品"},...db.products],"全部商品");
+}
+function renderProducts(){
+ const q=$("#productSearch").value.trim().toLowerCase();
+ const list=db.products.filter(p=>[p.name,p.barcode,p.spec,p.category].join(" ").toLowerCase().includes(q));
+ $("#productList").innerHTML=list.length?list.map(p=>`<div class="item"><div class="itemtitle">${esc(p.name)} <span class="tag">${esc(p.unit)}</span></div><div class="note">規格：${esc(p.spec||"未填")}｜條碼：${esc(p.barcode||"未填")}<br>供應商：${esc(supplier(p.supplierId)?.name||"未指定")}｜安全庫存：${fmt(p.safety)}｜盤點週期：${intervalText(p.interval)}<br>位置：${esc(p.location||"未填")}</div><div class="actions"><button class="smallbtn" data-edit-product="${p.id}">編輯</button><button class="smallbtn danger" data-delete-product="${p.id}">刪除</button></div></div>`).join(""):"<p class='note'>尚無符合的商品。</p>";
+}
+function renderSuppliers(){
+ $("#supplierList").innerHTML=db.suppliers.length?db.suppliers.map(s=>`<div class="item"><div class="itemtitle">${esc(s.name)}</div><div class="note">聯絡人：${esc(s.contact||"未填")}｜電話：${esc(s.phone||"未填")}<br>Email：${esc(s.email||"未填")}｜LINE：${esc(s.line||"未填")}<br>網址：${s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)}</a>`:"未填"}<br>地址：${esc(s.address||"未填")}<br>備註：${esc(s.note||"")}</div><div class="actions"><button class="smallbtn" data-edit-supplier="${s.id}">編輯</button><button class="smallbtn danger" data-delete-supplier="${s.id}">刪除</button></div></div>`).join(""):"<p class='note'>尚無供應商資料。</p>";
+}
+function renderInbounds(){
+ const rows=[...db.inbounds].sort((a,b)=>b.date.localeCompare(a.date));
+ $("#inboundList").innerHTML=rows.length?rows.slice(0,30).map(i=>`<div class="item"><div class="itemtitle">${esc(product(i.productId)?.name||"已刪除商品")}｜${esc(i.date)}</div><div class="note">數量：${fmt(i.qty)} ${esc(product(i.productId)?.unit||"")}｜整批金額：$${fmt(i.amount)}｜單位成本：$${fmt(i.unitCost)}<br>供應商：${esc(supplier(i.supplierId)?.name||"未指定")}｜批號：${esc(i.lot||"未填")}｜效期：${dateText(i.expiry)}<br>訂單／發票：${esc(i.invoice||"未填")}</div></div>`).join(""):"<p class='note'>尚無進貨紀錄。</p>";
+}
+function renderStock(){
+ $("#stockTable").innerHTML=db.products.length?db.products.map(p=>{
+  const c=lastCount(p.id),est=estimate(p);
+  return `<tr><td>${esc(p.name)}<br><span class="note">${esc(p.spec||"")}</span></td><td>${c?fmt(c.qty)+" "+esc(p.unit)+"<br>"+esc(c.date):"尚未盤點"}</td><td>${c?fmt(inboundAfter(p.id,c.date)):"無盤點基準"}</td><td>${est===null?"待首次盤點":fmt(est)+" "+esc(p.unit)}</td><td>${fmt(p.safety)} ${esc(p.unit)}</td></tr>`;
+ }).join(""):"<tr><td colspan='5'>請先建立商品。</td></tr>";
+}
+function renderDue(){
+ const due=db.products.filter(p=>{const d=dueDate(p);return !d||d<=today();});
+ $("#dueList").innerHTML=due.length?due.map(p=>{const d=dueDate(p);return `<div class="item"><div class="itemtitle">${esc(p.name)} <span class="tag ${!d||d<today()?"bad":"warn"}">${!d?"尚未盤點":d<today()?"逾期盤點":"今日到期"}</span></div><div class="note">盤點週期：${intervalText(p.interval)}｜上次盤點：${lastCount(p.id)?.date||"尚無紀錄"}</div><div class="actions"><button class="smallbtn" data-quick-count="${p.id}">前往盤點</button></div></div>`}).join(""):"<p class='note'>目前沒有到期盤點項目。</p>";
+}
+function renderAlerts(){
+ const alerts=[];
+ const due=db.products.filter(p=>!lastCount(p.id)||dueDate(p)<=today());
+ if(due.length)alerts.push(`有 ${due.length} 項商品需要首次盤點或已到盤點日期。`);
+ const low=db.products.filter(p=>{const n=estimate(p);return n!==null&&n<=Number(p.safety||0);});
+ if(low.length)alerts.push("推估庫存達安全庫存警戒："+low.map(p=>p.name).join("、")+"。");
+ const exp=db.inbounds.filter(i=>i.expiry&&i.qty>0&&i.expiry<=new Date(Date.now()+30*86400000).toLocaleDateString("en-CA"));
+ if(exp.length)alerts.push("有 "+exp.length+" 筆進貨批次效期在 30 天內或已過期，請核對實際剩餘數量。");
+ $("#alerts").innerHTML=alerts.length?alerts.map(x=>`<div class="item">${esc(x)}</div>`).join(""):"目前沒有已知的盤點或低庫存提醒。";
+ $("#statProducts").textContent=db.products.length;
+ $("#statCounts").textContent=due.length;
+ $("#statExpiry").textContent=exp.length;
+}
+function renderHistory(){
+ const pid=$("#historyProduct").value;
+ const records=[
+ ...db.inbounds.filter(x=>!pid||x.productId===pid).map(x=>({...x,type:"進貨",createdAt:x.createdAt||""})),
+ ...db.counts.filter(x=>!pid||x.productId===pid).map(x=>({...x,type:"盤點",createdAt:x.createdAt||""}))
+ ].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+ $("#historyList").innerHTML=records.length?records.map(x=>`<div class="item"><div class="itemtitle">${esc(x.type)}｜${esc(product(x.productId)?.name||"已刪除商品")}｜${esc(x.date)}</div><div class="note">${x.type==="進貨"?`數量：${fmt(x.qty)}｜整批金額：$${fmt(x.amount)}｜單位成本：$${fmt(x.unitCost)}<br>批號：${esc(x.lot||"未填")}｜效期：${dateText(x.expiry)}`:`實際盤點：${fmt(x.qty)} ${esc(product(x.productId)?.unit||"")}｜備註：${esc(x.note||"無")}`}</div></div>`).join(""):"<p class='note'>目前沒有紀錄。</p>";
+}
+function render(){
+ renderSelects();renderProducts();renderSuppliers();renderInbounds();renderStock();renderDue();renderAlerts();renderHistory();
+ $("#storageInfo").textContent=`目前有 ${db.products.length} 項商品、${db.suppliers.length} 家供應商、${db.inbounds.length} 筆進貨、${db.counts.length} 筆盤點紀錄。`;
+}
+function page(name){
+ $$(".page").forEach(s=>s.classList.toggle("hidden",s.id!==name));
+ $$("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
+}
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("[data-page]");if(b)page(b.dataset.page);});
+$("#productSearch").addEventListener("input",renderProducts);
+$("#historyProduct").addEventListener("change",renderHistory);
+$("#cancelProduct").addEventListener("click",()=>{resetForm($("#productForm"));$("#productFormTitle").textContent="新增商品";});
+$("#cancelSupplier").addEventListener("click",()=>{resetForm($("#supplierForm"));$("#supplierFormTitle").textContent="新增供應商";});
+$("#productForm").addEventListener("submit",e=>{
+ e.preventDefault();const f=formObj(e.target);const old=f.id?product(f.id):null;
+ if(f.barcode&&db.products.some(p=>p.barcode===f.barcode&&p.id!==f.id)){alert("此條碼已被其他商品使用，請先核對商品。");return;}
+ const p={id:f.id||uid(),name:f.name.trim(),barcode:f.barcode.trim(),spec:f.spec.trim(),unit:f.unit.trim(),category:f.category.trim(),safety:Number(f.safety||0),supplierId:f.supplierId,interval:Number(f.interval||30),location:f.location.trim(),note:f.note.trim(),createdAt:old?.createdAt||new Date().toISOString()};
+ if(old)db.products[db.products.findIndex(x=>x.id===old.id)]=p;else db.products.push(p);
+ resetForm(e.target);$("#productFormTitle").textContent="新增商品";save();alert("商品已儲存。");
+});
+$("#supplierForm").addEventListener("submit",e=>{
+ e.preventDefault();const f=formObj(e.target);const old=f.id?supplier(f.id):null;
+ const s={id:f.id||uid(),name:f.name.trim(),contact:f.contact.trim(),phone:f.phone.trim(),email:f.email.trim(),line:f.line.trim(),url:f.url.trim(),address:f.address.trim(),note:f.note.trim(),createdAt:old?.createdAt||new Date().toISOString()};
+ if(old)db.suppliers[db.suppliers.findIndex(x=>x.id===old.id)]=s;else db.suppliers.push(s);
+ resetForm(e.target);$("#supplierFormTitle").textContent="新增供應商";save();alert("供應商已儲存。");
+});
+$("#inProduct").addEventListener("change",()=>{const p=product($("#inProduct").value);if(p&&p.supplierId)$("#inSupplier").value=p.supplierId;updateUnitCost();});
+$("#inboundForm").addEventListener("input",updateUnitCost);
+function updateUnitCost(){const f=$("#inboundForm");const qty=Number(f.elements.qty.value),amount=Number(f.elements.amount.value);$("#unitCost").textContent=qty>0&&f.elements.amount.value!==""?`計算單位成本：$${fmt(amount/qty)}／${product(f.elements.productId.value)?.unit||"單位"}`:"選擇商品與數量後會計算單位成本。";}
+$("#inboundForm").addEventListener("submit",e=>{
+ e.preventDefault();const f=formObj(e.target);
+ if(!product(f.productId)){alert("請先選擇商品。");return;}
+ const qty=Number(f.qty),amount=Number(f.amount);
+ if(!(qty>0)||!(amount>=0)){alert("請確認進貨數量與金額。");return;}
+ if(!confirm(`確認新增這筆進貨？\n商品：${product(f.productId).name}\n數量：${qty}\n整批金額：$${amount}\n確認後會增加一筆進貨紀錄。`))return;
+ db.inbounds.push({id:uid(),date:f.date,productId:f.productId,supplierId:f.supplierId,qty,amount,unitCost:amount/qty,lot:f.lot.trim(),expiry:f.expiry,invoice:f.invoice.trim(),createdAt:new Date().toISOString()});
+ resetForm(e.target);f.date=today();e.target.elements.date.value=today();save();alert("進貨紀錄已保存。");
+});
+$("#countProduct").addEventListener("change",()=>{
+ const p=product($("#countProduct").value),c=p&&lastCount(p.id);
+ $("#lastCountInfo").textContent=p?(c?`上次盤點日期：${c.date}，數量：${fmt(c.qty)} ${p.unit}。盤點週期：${intervalText(p.interval)}。`:"此商品尚未有盤點基準，這次會建立首次盤點。"):"選擇商品後會顯示上次盤點資訊。";
+});
+$("#countForm").addEventListener("submit",e=>{
+ e.preventDefault();const f=formObj(e.target),p=product(f.productId);
+ if(!p){alert("請先選擇商品。");return;}
+ const qty=Number(f.qty),old=lastCount(p.id);
+ if(!(qty>=0)){alert("盤點數量不可小於零。");return;}
+ const after=old?qty-(Number(old.qty)+inboundAfter(p.id,old.date)):null;
+ const msg=`商品：${p.name}\n實際盤點數量：${qty} ${p.unit}`+(after===null?"\n這是首次盤點。":`\n與推估庫存差異：${fmt(after)} ${p.unit}`)+"\n是否保存？";
+ if(!confirm(msg))return;
+ db.counts.push({id:uid(),date:f.date,productId:p.id,qty,note:f.note.trim(),createdAt:new Date().toISOString()});
+ resetForm(e.target);e.target.elements.date.value=today();save();alert("盤點紀錄已保存。");
+});
+document.addEventListener("click",e=>{
+ const b=e.target.closest("button");if(!b)return;
+ if(b.dataset.editProduct){
+  const p=product(b.dataset.editProduct),f=$("#productForm");
+  Object.entries(p).forEach(([k,v])=>{if(f.elements[k])f.elements[k].value=v??"";});
+  $("#productFormTitle").textContent="編輯商品";page("products");window.scrollTo(0,0);
+ }
+ if(b.dataset.deleteProduct){
+  const id=b.dataset.deleteProduct;
+  if(db.inbounds.some(x=>x.productId===id)||db.counts.some(x=>x.productId===id)){alert("此商品已有進貨或盤點歷史，為保留歷史資料，暫不允許刪除。");return;}
+  if(confirm("確定刪除此商品？")){db.products=db.products.filter(p=>p.id!==id);save();}
+ }
+ if(b.dataset.editSupplier){
+  const s=supplier(b.dataset.editSupplier),f=$("#supplierForm");
+  Object.entries(s).forEach(([k,v])=>{if(f.elements[k])f.elements[k].value=v??"";});
+  $("#supplierFormTitle").textContent="編輯供應商";page("suppliers");window.scrollTo(0,0);
+ }
+ if(b.dataset.deleteSupplier){
+  const id=b.dataset.deleteSupplier;
+  if(db.products.some(p=>p.supplierId===id)||db.inbounds.some(i=>i.supplierId===id)){alert("此供應商已被商品或進貨紀錄引用，請先編輯相關資料後再刪除。");return;}
+  if(confirm("確定刪除此供應商？")){db.suppliers=db.suppliers.filter(s=>s.id!==id);save();}
+ }
+ if(b.dataset.quickCount){
+  page("counts");$("#countProduct").value=b.dataset.quickCount;$("#countProduct").dispatchEvent(new Event("change"));$("#countForm").elements.date.value=today();window.scrollTo(0,0);
+ }
+});
+$("#exportBtn").addEventListener("click",()=>{
+ const blob=new Blob([JSON.stringify({...db,exportedAt:new Date().toISOString(),formatVersion:1},null,2)],{type:"application/json"});
+ const url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download="動物醫院庫存備份_"+today()+".json";a.click();URL.revokeObjectURL(url);
+});
+$("#importBtn").addEventListener("click",async()=>{
+ const file=$("#importFile").files[0];if(!file){alert("請先選擇 JSON 備份檔。");return;}
+ try{
+  const d=JSON.parse(await file.text());
+  if(!d||!Array.isArray(d.products)||!Array.isArray(d.suppliers)||!Array.isArray(d.inbounds)||!Array.isArray(d.counts))throw Error("格式不符");
+  if(!confirm("這會取代目前瀏覽器中的全部庫存資料，確定繼續？"))return;
+  db={products:d.products,suppliers:d.suppliers,inbounds:d.inbounds,counts:d.counts};save();alert("備份還原完成。");
+ }catch{alert("無法還原：檔案格式錯誤或不是本系統的備份檔。");}
+});
+$("#productForm").elements.safety.value="0";
+$("#inboundForm").elements.date.value=today();
+$("#countForm").elements.date.value=today();
+render();
+</script>
+</body>
+</html>
