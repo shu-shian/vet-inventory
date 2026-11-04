@@ -212,9 +212,38 @@ function formObj(form){return Object.fromEntries(new FormData(form).entries());}
 function resetForm(form){form.reset();const id=form.querySelector('[name="id"]');if(id)id.value="";}
 function product(id){return db.products.find(p=>p.id===id);}
 function supplier(id){return db.suppliers.find(s=>s.id===id);}
-function lastCount(pid){return db.counts.filter(c=>c.productId===pid).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt))[0]||null;}
-function inboundAfter(pid,date){return db.inbounds.filter(i=>i.productId===pid&&(!date||i.date>date)).reduce((n,i)=>n+Number(i.qty),0);}
-function estimate(p){const c=lastCount(p.id);return c?Number(c.qty)+inboundAfter(p.id,c.date):null;}
+
+function recordTime(record){
+ const time=Date.parse(record.createdAt||"");
+ if(Number.isFinite(time))return time;
+
+ // 舊紀錄若沒有操作時間，暫以日期作為排序依據
+ const date=String(record.date||"");
+ const fallback=Date.parse(date+"T00:00:00");
+ return Number.isFinite(fallback)?fallback:0;
+}
+
+function lastCount(pid){
+ return db.counts
+  .map((c,index)=>({...c,_index:index}))
+  .filter(c=>c.productId===pid)
+  .sort((a,b)=>recordTime(b)-recordTime(a)||b._index-a._index)[0]||null;
+}
+
+function inboundAfter(pid,count){
+ if(!count)return 0;
+ const countTime=recordTime(count);
+
+ return db.inbounds
+  .filter(i=>i.productId===pid&&recordTime(i)>countTime)
+  .reduce((n,i)=>n+Number(i.qty||0),0);
+}
+
+function estimate(p){
+ const c=lastCount(p.id);
+ return c?Number(c.qty)+inboundAfter(p.id,c):null;
+}
+
 function dueDate(p){const c=lastCount(p.id);if(!c)return null;const d=new Date(c.date+"T12:00:00");d.setDate(d.getDate()+Number(p.interval||30));return d.toLocaleDateString("en-CA");}
 function daysBetween(a,b){return Math.ceil((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);}
 function setOptions(sel,items,firstLabel){
@@ -244,7 +273,7 @@ function renderInbounds(){
 function renderStock(){
  $("#stockTable").innerHTML=db.products.length?db.products.map(p=>{
   const c=lastCount(p.id),est=estimate(p);
-  return `<tr><td>${esc(p.name)}<br><span class="note">${esc(p.spec||"")}</span></td><td>${c?fmt(c.qty)+" "+esc(p.unit)+"<br>"+esc(c.date):"尚未盤點"}</td><td>${c?fmt(inboundAfter(p.id,c.date)):"無盤點基準"}</td><td>${est===null?"待首次盤點":fmt(est)+" "+esc(p.unit)}</td><td>${fmt(p.safety)} ${esc(p.unit)}</td></tr>`;
+  return `<tr><td>${esc(p.name)}<br><span class="note">${esc(p.spec||"")}</span></td><td>${c?fmt(c.qty)+" "+esc(p.unit)+"<br>"+esc(c.date):"尚未盤點"}</td><td>${c?fmt(inboundAfter(p.id,c)):"無盤點基準"}</td><td>${est===null?"待首次盤點":fmt(est)+" "+esc(p.unit)}</td><td>${fmt(p.safety)} ${esc(p.unit)}</td></tr>`;
  }).join(""):"<tr><td colspan='5'>請先建立商品。</td></tr>";
 }
 function renderDue(){
@@ -319,7 +348,7 @@ $("#countForm").addEventListener("submit",e=>{
  if(!p){alert("請先選擇商品。");return;}
  const qty=Number(f.qty),old=lastCount(p.id);
  if(!(qty>=0)){alert("盤點數量不可小於零。");return;}
- const after=old?qty-(Number(old.qty)+inboundAfter(p.id,old.date)):null;
+ const after=old?qty-(Number(old.qty)+inboundAfter(p.id,old)):null;
  const msg=`商品：${p.name}\n實際盤點數量：${qty} ${p.unit}`+(after===null?"\n這是首次盤點。":`\n與推估庫存差異：${fmt(after)} ${p.unit}`)+"\n是否保存？";
  if(!confirm(msg))return;
  db.counts.push({id:uid(),date:f.date,productId:p.id,qty,note:f.note.trim(),createdAt:new Date().toISOString()});
