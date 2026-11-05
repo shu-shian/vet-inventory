@@ -328,16 +328,85 @@ $("#supplierForm").addEventListener("submit",e=>{
  resetForm(e.target);$("#supplierFormTitle").textContent="新增供應商";save();alert("供應商已儲存。");
 });
 $("#inProduct").addEventListener("change",()=>{const p=product($("#inProduct").value);if(p&&p.supplierId)$("#inSupplier").value=p.supplierId;updateUnitCost();});
-$("#inboundForm").addEventListener("input",updateUnitCost);
+$("#inboundForm").addEventListener("input",()=>{
+ inboundSavedLock=false;
+ updateUnitCost();
+});
 function updateUnitCost(){const f=$("#inboundForm");const qty=Number(f.elements.qty.value),amount=Number(f.elements.amount.value);$("#unitCost").textContent=qty>0&&f.elements.amount.value!==""?`計算單位成本：$${fmt(amount/qty)}／${product(f.elements.productId.value)?.unit||"單位"}`:"選擇商品與數量後會計算單位成本。";}
+let inboundSavedLock=false;
 $("#inboundForm").addEventListener("submit",e=>{
- e.preventDefault();const f=formObj(e.target);
- if(!product(f.productId)){alert("請先選擇商品。");return;}
+ e.preventDefault();
+
+ if(inboundSavedLock)return;
+
+ const f=formObj(e.target);
+
+ if(!product(f.productId)){
+  alert("請先選擇商品。");
+  return;
+ }
+
  const qty=Number(f.qty),amount=Number(f.amount);
- if(!(qty>0)||!(amount>=0)){alert("請確認進貨數量與金額。");return;}
- if(!confirm(`確認新增這筆進貨？\n商品：${product(f.productId).name}\n數量：${qty}\n整批金額：$${amount}\n確認後會增加一筆進貨紀錄。`))return;
- db.inbounds.push({id:uid(),date:f.date,productId:f.productId,supplierId:f.supplierId,qty,amount,unitCost:amount/qty,lot:f.lot.trim(),expiry:f.expiry,invoice:f.invoice.trim(),createdAt:new Date().toISOString()});
- resetForm(e.target);f.date=today();e.target.elements.date.value=today();save();alert("進貨紀錄已保存。");
+
+ if(!(qty>0)||!(amount>=0)){
+  alert("請確認進貨數量與金額。");
+  return;
+ }
+
+ if(!confirm(`確認新增這筆進貨？
+商品：${product(f.productId).name}
+數量：${qty}
+整批金額：$${amount}
+確認後會增加一筆進貨紀錄。`))return;
+
+ // 確認後立即鎖定，避免重複送出
+ inboundSavedLock=true;
+
+ // 保存新增前的資料，供失敗時還原
+ const previousData=localStorage.getItem(KEY);
+
+ db.inbounds.push({
+  id:uid(),
+  date:f.date,
+  productId:f.productId,
+  supplierId:f.supplierId,
+  qty,
+  amount,
+  unitCost:amount/qty,
+  lot:f.lot.trim(),
+  expiry:f.expiry,
+  invoice:f.invoice.trim(),
+  createdAt:new Date().toISOString()
+ });
+
+ try{
+  save();
+ }catch(error){
+  // 保存失敗，移除剛新增的紀錄
+  db.inbounds.pop();
+
+  // 還原保存前的資料
+  try{
+   if(previousData===null){
+    localStorage.removeItem(KEY);
+   }else{
+    localStorage.setItem(KEY,previousData);
+   }
+  }catch(restoreError){
+   console.error("資料還原失敗：",restoreError);
+  }
+
+  inboundSavedLock=false;
+  alert("進貨保存失敗，請確認儲存空間後重新操作。原本輸入資料已保留。");
+  return;
+ }
+
+ // 保存成功後才清空表單
+ resetForm(e.target);
+ e.target.elements.date.value=today();
+ updateUnitCost();
+
+ alert("進貨紀錄已保存。");
 });
 $("#countProduct").addEventListener("change",()=>{
  const p=product($("#countProduct").value),c=p&&lastCount(p.id);
