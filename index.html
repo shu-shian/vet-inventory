@@ -207,7 +207,16 @@ function load(){
  }catch{return blank();}
 }
 let db=load();
-function save(){localStorage.setItem(KEY,JSON.stringify(db));render();}
+let testSaveFailure=true;
+
+function save(){
+ if(testSaveFailure){
+  throw new Error("測試用：模擬保存失敗");
+ }
+
+ localStorage.setItem(KEY,JSON.stringify(db));
+ render();
+}
 function formObj(form){return Object.fromEntries(new FormData(form).entries());}
 function resetForm(form){form.reset();const id=form.querySelector('[name="id"]');if(id)id.value="";}
 function product(id){return db.products.find(p=>p.id===id);}
