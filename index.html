@@ -267,7 +267,12 @@ function renderSuppliers(){
  $("#supplierList").innerHTML=db.suppliers.length?db.suppliers.map(s=>`<div class="item"><div class="itemtitle">${esc(s.name)}</div><div class="note">聯絡人：${esc(s.contact||"未填")}｜電話：${esc(s.phone||"未填")}<br>Email：${esc(s.email||"未填")}｜LINE：${esc(s.line||"未填")}<br>網址：${s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.url)}</a>`:"未填"}<br>地址：${esc(s.address||"未填")}<br>備註：${esc(s.note||"")}</div><div class="actions"><button class="smallbtn" data-edit-supplier="${s.id}">編輯</button><button class="smallbtn danger" data-delete-supplier="${s.id}">刪除</button></div></div>`).join(""):"<p class='note'>尚無供應商資料。</p>";
 }
 function renderInbounds(){
- const rows=[...db.inbounds].sort((a,b)=>b.date.localeCompare(a.date));
+const rows=[...db.inbounds].sort((a,b)=>{
+ const dateOrder=b.date.localeCompare(a.date);
+ if(dateOrder!==0)return dateOrder;
+
+ return recordTime(b)-recordTime(a);
+});
  $("#inboundList").innerHTML=rows.length?rows.slice(0,30).map(i=>`<div class="item"><div class="itemtitle">${esc(product(i.productId)?.name||"已刪除商品")}｜${esc(i.date)}</div><div class="note">數量：${fmt(i.qty)} ${esc(product(i.productId)?.unit||"")}｜整批金額：$${fmt(i.amount)}｜單位成本：$${fmt(i.unitCost)}<br>供應商：${esc(supplier(i.supplierId)?.name||"未指定")}｜批號：${esc(i.lot||"未填")}｜效期：${dateText(i.expiry)}<br>訂單／發票：${esc(i.invoice||"未填")}</div></div>`).join(""):"<p class='note'>尚無進貨紀錄。</p>";
 }
 function renderStock(){
