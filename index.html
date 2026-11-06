@@ -198,14 +198,37 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmt=n=>Number(n||0).toLocaleString("zh-TW",{maximumFractionDigits:3});
 const dateText=d=>d||"未填";
 const intervalText=n=>({"14":"每兩週","30":"每月","90":"每三個月","182":"每半年","365":"每年"}[String(n)]||"每月");
-function blank(){return {products:[],suppliers:[],inbounds:[],counts:[]};}
+function blank(){
+ return {
+  products:[],
+  suppliers:[],
+  inbounds:[],
+  counts:[],
+  batchSnapshots:[],
+  batchAdjustments:[]
+ };
+}
+
 function load(){
  try{
   const d=JSON.parse(localStorage.getItem(KEY)||"null");
-  if(!d||!Array.isArray(d.products)||!Array.isArray(d.suppliers)||!Array.isArray(d.inbounds)||!Array.isArray(d.counts))return blank();
-  return d;
+
+  if(
+   !d||
+   !Array.isArray(d.products)||
+   !Array.isArray(d.suppliers)||
+   !Array.isArray(d.inbounds)||
+   !Array.isArray(d.counts)
+  )return blank();
+
+  return {
+   ...d,
+   batchSnapshots:Array.isArray(d.batchSnapshots)?d.batchSnapshots:[],
+   batchAdjustments:Array.isArray(d.batchAdjustments)?d.batchAdjustments:[]
+  };
  }catch{return blank();}
 }
+
 let db=load();
 let testSaveFailure=false;
 
