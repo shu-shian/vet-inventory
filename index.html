@@ -497,7 +497,15 @@ $("#importBtn").addEventListener("click",async()=>{
   const d=JSON.parse(await file.text());
   if(!d||!Array.isArray(d.products)||!Array.isArray(d.suppliers)||!Array.isArray(d.inbounds)||!Array.isArray(d.counts))throw Error("格式不符");
   if(!confirm("這會取代目前瀏覽器中的全部庫存資料，確定繼續？"))return;
-  db={products:d.products,suppliers:d.suppliers,inbounds:d.inbounds,counts:d.counts};save();alert("備份還原完成。");
+db={
+ products:d.products,
+ suppliers:d.suppliers,
+ inbounds:d.inbounds,
+ counts:d.counts,
+ batchSnapshots:Array.isArray(d.batchSnapshots)?d.batchSnapshots:[],
+ batchAdjustments:Array.isArray(d.batchAdjustments)?d.batchAdjustments:[]
+};
+save();alert("備份還原完成。");
  }catch{alert("無法還原：檔案格式錯誤或不是本系統的備份檔。");}
 });
 $("#productForm").elements.safety.value="0";
